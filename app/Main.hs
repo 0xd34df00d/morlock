@@ -15,37 +15,37 @@ data Op r where
 
   CAS :: IntPtr -> Int -> Int -> Op Bool
 
-data Program r where
-  Pure :: r -> Program r
-  Bind :: Op a -> (a -> Program b) -> Program b
+data Program l r where
+  Pure :: r -> Program l r
+  Bind :: l a -> (a -> Program l b) -> Program l b
 
-lift :: Op r -> Program r
+lift :: l r -> Program l r
 lift op = op `Bind` Pure
 
-read :: IntPtr -> Program Int
+read :: IntPtr -> Program Op Int
 read ptr = lift $ Read ptr
 
-write :: IntPtr -> Int -> Program ()
+write :: IntPtr -> Int -> Program Op ()
 write ptr val = lift $ Write ptr val
 
-cas :: IntPtr -> Int -> Int -> Program Bool
+cas :: IntPtr -> Int -> Int -> Program Op Bool
 cas ptr cmp val = lift $ CAS ptr cmp val
 
-instance Functor Program where
+instance Functor (Program l) where
   fmap f (Pure v) = Pure $ f v
   fmap f (Bind op act) = Bind op (fmap f . act)
 
-instance Applicative Program where
+instance Applicative (Program l) where
   pure = Pure
 
   Pure f    <*> v = f <$> v
   Bind op f <*> v = Bind op (\r -> f r <*> v)
 
-instance Monad Program where
+instance Monad (Program l) where
   Pure v    >>= g = g v
   Bind op f >>= g = Bind op (f >=> g)
 
-add :: IntPtr -> Int -> Program Int
+add :: IntPtr -> Int -> Program Op Int
 add p a = snd <$> do
   iterateUntil fst $ do
     value <- read p
