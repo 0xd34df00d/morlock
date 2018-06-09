@@ -1,47 +1,56 @@
+{-# LANGUAGE GADTs #-}
+
+module Main where
+
 import Prelude hiding(read)
 
+import Control.Monad
 import Control.Monad.Loops
 
-newtype IntPtr = IntPtr { ptr :: Int } deriving (Eq, Ord, Show)
+newtype IntPtr = IntPtr Int deriving (Eq, Ord, Show)
 
 data Op r where
-  OpPure :: a -> Op a
-  OpBind :: Op a -> (a -> Op b) -> Op b
+  Read  :: IntPtr -> Op Int
+  Write :: IntPtr -> Int -> Op ()
 
-  OpRead :: IntPtr -> Op Int
-  OpWrite :: IntPtr -> Int -> Op ()
+  CAS :: IntPtr -> Int -> Int -> Op Bool
 
-  OpCAS :: IntPtr -> Int -> Int -> Op Bool
+data Program r where
+  Pure :: r -> Program r
+  Bind :: Op a -> (a -> Program b) -> Program b
 
-instance Functor Op where
-  fmap f (OpPure x) = OpPure (f x)
-  fmap f (OpBind op act) = do
-    val <- op
-    f <$> act val
-  fmap f prim = do
-    val <- prim
-    pure $ f val
+lift :: Op r -> Program r
+lift op = op `Bind` Pure
 
-instance Applicative Op where
-  pure = OpPure
-  (OpPure f) <*> v = fmap f v
-  (OpBind op act) <*> v = do
-    val <- op
-    f <- act val
-    fmap f v
+read :: IntPtr -> Program Int
+read ptr = lift $ Read ptr
 
-instance Monad Op where
-  (>>=) = OpBind
+write :: IntPtr -> Int -> Program ()
+write ptr val = lift $ Write ptr val
 
-read :: IntPtr -> Op Int
-read = OpRead
+cas :: IntPtr -> Int -> Int -> Program Bool
+cas ptr cmp val = lift $ CAS ptr cmp val
 
-cas :: IntPtr -> Int -> Int -> Op Bool
-cas = OpCAS
+instance Functor Program where
+  fmap f (Pure v) = Pure $ f v
+  fmap f (Bind op act) = Bind op (fmap f . act)
 
-add :: IntPtr -> Int -> Op Int
+instance Applicative Program where
+  pure = Pure
+
+  Pure f    <*> v = f <$> v
+  Bind op f <*> v = Bind op (\r -> f r <*> v)
+
+instance Monad Program where
+  Pure v    >>= g = g v
+  Bind op f >>= g = Bind op (f >=> g)
+
+add :: IntPtr -> Int -> Program Int
 add p a = snd <$> do
   iterateUntil fst $ do
     value <- read p
     success <- cas p value (value + a)
     pure (success, value + a)
+
+main :: IO ()
+main = undefined
