@@ -59,8 +59,7 @@ runProgramSeq (Bind (Write ptr val) act) = do
   modify' $ writeSeqSt ptr val
   runProgramSeq $ act ()
 runProgramSeq (Bind (CAS ptr cmp val) act) = do
-  (res, st') <- gets $ casSeqSt ptr cmp val
-  put st'
+  res <- state $ casSeqSt ptr cmp val
   runProgramSeq $ act res
 
 main :: IO ()
