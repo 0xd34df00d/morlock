@@ -3,6 +3,7 @@ import Prelude hiding(read)
 import qualified Data.Vector.Unboxed as VU
 import Control.Monad.Loops
 import Control.Monad.State
+import Test.Hspec
 
 import Control.Concurrent.Morlock.Op
 import Control.Concurrent.Morlock.State
@@ -17,4 +18,6 @@ add p a = snd <$> do
     pure (success, value + a)
 
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = hspec $ do
+  describe "Sequential execution" $ do
+    it "0 + 10 = 10" $ runState (runProgramSeq (add (IntPtr 0) 10)) (SeqState $ VU.fromList [0]) `shouldBe` (10, SeqState $ VU.fromList [10])
