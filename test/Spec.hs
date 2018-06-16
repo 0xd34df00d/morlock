@@ -17,7 +17,17 @@ add p a = snd <$> do
     success <- cas p value (value + a)
     pure (success, value + a)
 
+initState :: SeqState
+initState = SeqState $ VU.fromList [0]
+
+initState' :: [Int] -> SeqState
+initState' = SeqState . VU.fromList
+
+runProgramSeq' p = runState $ runProgramSeq p
+
 main :: IO ()
 main = hspec $ do
   describe "Sequential execution" $ do
-    it "0 + 10 = 10" $ runState (runProgramSeq (add (IntPtr 0) 10)) (SeqState $ VU.fromList [0]) `shouldBe` (10, SeqState $ VU.fromList [10])
+    it "basically works (0 + 10 = 10)" $ runProgramSeq' (add (IntPtr 0) 10) initState `shouldBe` (10, SeqState $ VU.fromList [10])
+    it "composes linearly (0 + 10 + 10 = 20)" $ runProgramSeq' (add (IntPtr 0) 10 >> add (IntPtr 0) 10) initState `shouldBe` (20, SeqState $ VU.fromList [20])
+    it "composes in parallel (0 + 10 = 10; 0 + 10 = 10)" $ runProgramSeq' (add (IntPtr 0) 10 >> add (IntPtr 1) 10) (initState' [0, 0]) `shouldBe` (10, SeqState $ VU.fromList [10, 10])
